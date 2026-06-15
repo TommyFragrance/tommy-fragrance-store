@@ -1,0 +1,107 @@
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+import slugify from "slugify";
+
+const prisma = new PrismaClient();
+
+function slug(input: string) {
+  return slugify(input, { lower: true, strict: true, locale: "ru" });
+}
+
+async function main() {
+  const email = process.env.ADMIN_EMAIL || "admin@tommyfragrance.ru";
+  const password = process.env.ADMIN_PASSWORD || "change-me-admin-password";
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  await prisma.user.upsert({
+    where: { email },
+    update: { passwordHash },
+    create: { email, name: "Tommy Fragrance", passwordHash, role: "ADMIN" }
+  });
+
+  const brands = [
+    { name: "Clive Christian", country: "Великобритания", description: "Британский парфюмерный дом в люксовом сегменте." },
+    { name: "Louis Vuitton", country: "Франция", description: "Французский дом с премиальной парфюмерной линией." },
+    { name: "Creed", country: "Франция", description: "Исторический парфюмерный дом, известный люксовыми ароматами." },
+    { name: "Tom Ford", country: "США", description: "Современная люксовая парфюмерия с выразительной эстетикой." }
+  ];
+
+  for (const brand of brands) {
+    await prisma.brand.upsert({
+      where: { slug: slug(brand.name) },
+      update: brand,
+      create: { ...brand, slug: slug(brand.name) }
+    });
+  }
+
+  const clive = await prisma.brand.findUniqueOrThrow({ where: { slug: slug("Clive Christian") } });
+  const tomFord = await prisma.brand.findUniqueOrThrow({ where: { slug: slug("Tom Ford") } });
+
+  await prisma.product.upsert({
+    where: { slug: "clive-christian-matsukita" },
+    update: {},
+    create: {
+      slug: "clive-christian-matsukita",
+      name: "Matsukita",
+      brandId: clive.id,
+      concentration: "Perfume",
+      brandCountry: "Великобритания",
+      gender: "унисекс",
+      aromaType: "шипровый, древесный, пряный",
+      description: "Демонстрационная карточка. Перед публикацией заполните поля по подтверждённым источникам.",
+      history: "",
+      longevity: "",
+      sillage: "",
+      seasonality: ["осень", "зима", "вечер"],
+      topNotes: [],
+      heartNotes: [],
+      baseNotes: [],
+      similarAromas: [],
+      sources: ["https://www.clivechristian.com/", "https://www.fragrantica.com/", "https://www.parfumo.com/"],
+      pricePerMlCents: 48000,
+      fullBottleMl: 50,
+      fullBottlePriceCents: 2208700,
+      stockMl: 100,
+      stockBottles: 1,
+      isPublished: true
+    }
+  });
+
+  await prisma.product.upsert({
+    where: { slug: "tom-ford-ombre-leather" },
+    update: {},
+    create: {
+      slug: "tom-ford-ombre-leather",
+      name: "Ombre Leather",
+      brandId: tomFord.id,
+      concentration: "Eau de Parfum",
+      brandCountry: "США",
+      gender: "унисекс",
+      aromaType: "кожаный, пряный, амбровый",
+      description: "Демонстрационная карточка. Перед публикацией заполните поля по подтверждённым источникам.",
+      history: "",
+      longevity: "",
+      sillage: "",
+      seasonality: ["осень", "зима", "вечер"],
+      topNotes: [],
+      heartNotes: [],
+      baseNotes: [],
+      similarAromas: [],
+      sources: ["https://www.tomfordbeauty.com/", "https://www.fragrantica.com/", "https://www.parfumo.com/"],
+      pricePerMlCents: 29000,
+      fullBottleMl: 100,
+      fullBottlePriceCents: 1502300,
+      stockMl: 300,
+      stockBottles: 2,
+      isPublished: true
+    }
+  });
+}
+
+main()
+  .then(async () => prisma.$disconnect())
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
